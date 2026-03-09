@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KGS Ultimate Pro</title>
+    
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Base Styles (No CDN needed) */
+        body { background-color: #0f0f17; color: white; font-family: sans-serif; margin: 0; padding-bottom: 80px; }
+        .bg-card { background-color: #1f1f2e; border-radius: 1.5rem; border: 1px solid #374151; margin-bottom: 1.5rem; overflow: hidden; }
+        .header { background-color: #1a1a2e; padding: 1rem; display: flex; justify-content: space-between; align-items: center; sticky: top; border-bottom: 1px solid #374151; }
+        
+        /* Ultra Wide 20:9 Fix */
+        .ratio-20-9 { width: 100%; aspect-ratio: 20 / 9 !important; position: relative; background: linear-gradient(135deg, #e11d48 0%, #f97316 100%); display: flex; align-items: center; justify-content: center; }
+        .player-container { width: 100%; aspect-ratio: 20 / 9 !important; background: black; position: relative; border-radius: 1rem; overflow: hidden; border: 1px solid #374151; margin-bottom: 1.5rem; }
+        
+        .video-js.vjs-20-9 { width: 100% !important; height: 100% !important; position: absolute; top: 0; left: 0; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .btn-study { background-color: #635bff; color: white; width: 100%; padding: 1rem; border-radius: 1rem; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; }
+        .hidden { display: none !important; }
+        
+        /* Bottom Nav */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a2e; display: flex; justify-content: space-around; padding: 1rem 0; border-top: 1px solid #374151; z-index: 100; }
+        .nav-item { text-align: center; color: #9ca3af; font-size: 10px; cursor: pointer; }
+        .nav-item.active { color: #ef4444; }
+        
+        /* Admin UI */
+        .admin-box { background: #1f1f2e; padding: 1.5rem; border-radius: 1.5rem; border: 1px solid rgba(239, 68, 68, 0.2); margin-bottom: 2rem; }
+        input { width: 90%; background: #0f0f17; border: 1px solid #374151; color: white; padding: 0.8rem; border-radius: 0.8rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-bars" onclick="toggleView('admin')"></i>
+            <h2 style="font-style: italic; margin: 0;">Khan Global Studies</h2>
+        </div>
+        <div style="background: #dc2626; padding: 5px 10px; border-radius: 5px;"><i class="fa-solid fa-play"></i></div>
+    </header>
+
+    <main id="mainContent" style="padding: 15px;"></main>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="toggleView('home')" id="homeTab">
+            <i class="fa-solid fa-house" style="font-size: 18px;"></i><br>My Batch
+        </div>
+        <div class="nav-item" onclick="toggleView('admin')" id="adminTab">
+            <i class="fa-solid fa-user-shield" style="font-size: 18px;"></i><br>Admin
+        </div>
+    </nav>
+
+    <script>
+        // --- 1. Storage & Data ---
+        const DB_KEY = 'KGS_FINAL_STAY_DATA';
+        let courses = JSON.parse(localStorage.getItem(DB_KEY)) || [
+            { id: 1, title: "72nd BPSC Prelims", tag: "Live", videos: [{title: "Demo", link: "https://vjs.zencdn.net/v/oceans.mp4"}] }
+        ];
+
+        function save() { localStorage.setItem(DB_KEY, JSON.stringify(courses)); }
+        let hlsPlayer = null;
+
+        // --- 2. Navigation ---
+        function toggleView(view) {
+            if(hlsPlayer) { hlsPlayer.dispose(); hlsPlayer = null; }
+            document.getElementById('homeTab').classList.remove('active');
+            document.getElementById('adminTab').classList.remove('active');
+
+            if (view === 'home') {
+                document.getElementById('homeTab').classList.add('active');
+                renderHome();
+            } else {
+                const p = prompt("Password:");
+                if(p === "1234") { // Admin Password
+                    document.getElementById('adminTab').classList.add('active');
+                    renderAdmin();
+                } else { alert("Wrong Password!"); toggleView('home'); }
+            }
+        }
+
+        // --- 3. Home View ---
+        function renderHome() {
+            let html = '';
+            courses.forEach(c => {
+                html += `
+                <div class="bg-card">
+                    <div class="ratio-20-9">
+                        <h1 style="text-transform: uppercase; font-style: italic; font-weight: 900; font-size: 1.8rem; text-shadow: 2px 2px 10px rgba(0,0,0,0.5);">${c.title}</h1>
+                    </div>
+                    <div style="padding: 15px;">
+                        <button class="btn-study" onclick="viewLectures(${c.id})">STUDY NOW</button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('mainContent').innerHTML = html || '<p style="text-align:center;">No courses yet.</p>';
+        }
+
+        // --- 4. Video Player (20:9 Fix) ---
+        function viewLectures(id) {
+            const course = courses.find(c => c.id === id);
+            const firstLink = course.videos[0] ? course.videos[0].link : '';
+
+            let html = `
+                <button onclick="renderHome()" style="background: none; color: #635bff; border: none; font-weight: bold; margin-bottom: 15px; cursor: pointer;"><i class="fa-solid fa-arrow-left"></i> BACK</button>
+                <div class="player-container">
+                    <iframe id="yt" class="hidden"></iframe>
+                    <div id="vjsWrap" class="hidden" style="width:100%; height:100%;">
+                        <video id="vid" class="video-js vjs-default-skin vjs-20-9 vjs-big-play-centered" controls preload="auto"></video>
+                    </div>
+                </div>
+                <h3 style="border-left: 4px solid #ef4444; padding-left: 10px;">${course.title} Lectures</h3>
+                <div style="margin-top: 15px;">`;
+
+            course.videos.forEach(v => {
+                html += `
+                <div onclick="play('${v.link}')" style="background: #1f1f2e; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #374151;">
+                    <span style="font-size: 14px;">${v.title}</span>
+                    <i class="fa-solid fa-circle-play" style="color: #635bff; font-size: 20px;"></i>
+                </div>`;
+            });
+
+            document.getElementById('mainContent').innerHTML = html + `</div>`;
+            if(firstLink) setTimeout(() => play(firstLink), 100);
+        }
+
+        function play(url) {
+            const yt = document.getElementById('yt');
+            const vjs = document.getElementById('vjsWrap');
+            if(url.includes('youtube.com') || url.includes('youtu.be')) {
+                vjs.classList.add('hidden'); yt.classList.remove('hidden');
+                let vidId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : url.split('/').pop();
+                yt.src = `https://www.youtube.com/embed/${vidId}?autoplay=1`;
+                if(hlsPlayer) hlsPlayer.pause();
+            } else {
+                yt.classList.add('hidden'); vjs.classList.remove('hidden');
+                if(!hlsPlayer) hlsPlayer = videojs('vid');
+                hlsPlayer.src({ src: url, type: url.includes('m3u8') ? 'application/x-mpegURL' : 'video/mp4' });
+                hlsPlayer.play();
+            }
+        }
+
+        // --- 5. Admin Panel ---
+        function renderAdmin() {
+            let html = `
+                <div class="admin-box">
+                    <h4 style="color: #ef4444; margin-top: 0;">ADD NEW BATCH</h4>
+                    <input id="t" placeholder="Batch Name">
+                    <button class="btn-study" style="background: #059669;" onclick="addC()">SAVE BATCH</button>
+                </div>`;
+            
+            courses.forEach(c => {
+                html += `
+                <div style="background: #1f1f2e; padding: 15px; border-radius: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold;">${c.title}</span>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="addV(${c.id})" style="background: #2563eb; color: white; border: none; padding: 5px 10px; border-radius: 5px;">ADD VIDEO</button>
+                        <button onclick="delC(${c.id})" style="background: #4b5563; color: white; border: none; padding: 5px 10px; border-radius: 5px;"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('mainContent').innerHTML = html;
+        }
+
+        function addC() {
+            const val = document.getElementById('t').value;
+            if(val) { courses.unshift({id: Date.now(), title: val, videos: []}); save(); renderAdmin(); }
+        }
+
+        function addV(id) {
+            const t = prompt("Video Title:");
+            const l = prompt("Link (.m3u8 / .mp4 / YouTube):");
+            if(t && l) { courses.find(c => c.id === id).videos.push({title: t, link: l}); save(); renderAdmin(); }
+        }
+
+        function delC(id) { if(confirm("Delete this?")) { courses = courses.filter(c => c.id !== id); save(); renderAdmin(); } }
+
+        // Start
+        renderHome();
+    </script>
+</body>
+</html>
